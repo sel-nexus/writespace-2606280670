@@ -101,7 +101,7 @@ export default function LandingPage() {
                 ))}
               </div>
             ) : (
-              <p className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-slate-600">No posts yet - check back soon!</p>
+              <p className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-slate-600">No posts yet — check back soon!</p>
             )}
           </div>
         </section>

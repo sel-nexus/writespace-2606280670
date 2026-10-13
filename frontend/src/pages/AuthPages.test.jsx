@@ -18,7 +18,7 @@ describe('public and identity pages', () => {
     expect(screen.getByText('Your thoughts. Your space. Beautifully simple.')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Login' }).every((link) => link.getAttribute('href') === '/login')).toBe(true);
     expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute('href', '/register');
-    expect(screen.getByText('No posts yet - check back soon!')).toBeInTheDocument();
+    expect(screen.getByText('No posts yet — check back soon!')).toBeInTheDocument();
   });
 
   it('shows the invalid credential message after a failed login', () => {
@@ -35,6 +35,29 @@ describe('public and identity pages', () => {
     expect(screen.getByText('Display name is required.')).toBeInTheDocument();
     expect(screen.getByText('Username is required.')).toBeInTheDocument();
     expect(screen.getByText('Password is required.')).toBeInTheDocument();
+  });
+
+  it('shows a registration password mismatch error', () => {
+    renderAt('/register', <RegisterPage />);
+    fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Rae Writer' } });
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'rae' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-one' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'secret-two' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+    expect(screen.getByText('Passwords do not match.')).toBeInTheDocument();
+  });
+
+  it('shows a duplicate username registration error', () => {
+    window.localStorage.setItem('writespace_users', JSON.stringify([
+      { userId: 'u1', username: 'rae', displayName: 'Rae Writer', password: 'secret', role: 'user' },
+    ]));
+    renderAt('/register', <RegisterPage />);
+    fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Another Rae' } });
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'rae' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+    expect(screen.getByText('That username is already taken.')).toBeInTheDocument();
   });
 
   it('redirects guests from protected routes to login', () => {
