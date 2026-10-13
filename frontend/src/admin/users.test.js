@@ -42,6 +42,15 @@ describe('administrator account operations', () => {
     expect(createManagedUser({ displayName: 'Admin', username: 'admin', password: 'secret', role: 'user' }).errors.username).toBe('That username is already taken.');
   });
 
+  it('rejects invalid input types and handles excessively large account values', () => {
+    expect(createManagedUser(null).ok).toBe(false);
+    expect(createManagedUser({ displayName: {}, username: 42, password: null, role: 'user' }).ok).toBe(false);
+    const oversized = 'x'.repeat(100_000);
+    const result = createManagedUser({ displayName: oversized, username: 'large-user', password: 'secret', role: 'user' });
+    expect(result.ok).toBe(true);
+    expect(result.user.displayName).toBe(oversized);
+  });
+
   it('protects the default admin, current account, and non-admin sessions from deletion', () => {
     createManagedUser({ displayName: 'Rae', username: 'rae', password: 'secret', role: 'user' });
     const userId = JSON.parse(window.localStorage.getItem(USERS_KEY))[0].userId;
@@ -61,8 +70,12 @@ describe('administrator account operations', () => {
 
   it('reports missing accounts and storage write failures', () => {
     expect(deleteManagedUser('missing', admin).error).toBe('Account not found.');
+    const created = createManagedUser({ displayName: 'Rae', username: 'rae', password: 'secret', role: 'user' }).user;
+    const before = window.localStorage.getItem(USERS_KEY);
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
-    expect(createManagedUser({ displayName: 'Rae', username: 'rae', password: 'secret', role: 'user' }).errors.form).toContain('Browser storage is unavailable');
+    expect(createManagedUser({ displayName: 'Kai', username: 'kai', password: 'secret', role: 'user' }).errors.form).toContain('Browser storage is unavailable');
+    expect(deleteManagedUser(created.userId, admin).error).toContain('Browser storage is unavailable');
+    expect(window.localStorage.getItem(USERS_KEY)).toBe(before);
     setItem.mockRestore();
   });
 });

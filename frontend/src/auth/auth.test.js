@@ -19,6 +19,38 @@ describe('local identity helpers', () => {
     expect(getSession()).toBeNull();
   });
 
+  it('rejects invalid input types and handles excessively large registration values', () => {
+    expect(login(null, {})).toEqual({ ok: false, error: 'Invalid username or password.' });
+    expect(register({ displayName: {}, username: 42, password: null, confirmPassword: [] }).ok).toBe(false);
+    const oversized = 'x'.repeat(100_000);
+    const result = register({ displayName: oversized, username: 'large-user', password: 'secret', confirmPassword: 'secret' });
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(window.localStorage.getItem(USERS_KEY))[0].displayName).toBe(oversized);
+  });
+
+  it('handles storage write failures for admin and user login and registration writes', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    expect(login('admin', 'admin').ok).toBe(false);
+    setItem.mockRestore();
+
+    register({ displayName: 'Rae', username: 'rae', password: 'secret', confirmPassword: 'secret' });
+    window.localStorage.removeItem('writespace_session');
+    const userLoginSetItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    expect(login('rae', 'secret').ok).toBe(false);
+    userLoginSetItem.mockRestore();
+
+    const accountWrite = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    expect(register({ displayName: 'Kai', username: 'kai', password: 'secret', confirmPassword: 'secret' }).ok).toBe(false);
+    accountWrite.mockRestore();
+
+    const sessionWrite = vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+      if (key === 'writespace_session') throw new Error('blocked');
+      return Storage.prototype.setItem.wrappedMethod.call(window.localStorage, key, value);
+    });
+    expect(register({ displayName: 'Mira', username: 'mira', password: 'secret', confirmPassword: 'secret' }).ok).toBe(false);
+    sessionWrite.mockRestore();
+  });
+
   it('registers a user, persists the account and session, and logs in after reload', () => {
     const result = register({ displayName: 'Rae Writer', username: 'rae', password: 'secret', confirmPassword: 'secret' });
     expect(result.ok).toBe(true);

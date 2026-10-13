@@ -25,6 +25,15 @@ describe('local post operations', () => {
     expect(getPosts()).toEqual([]);
   });
 
+  it('rejects invalid input types and handles excessively large post values', () => {
+    expect(createPost(null, writer).ok).toBe(false);
+    expect(createPost({ title: 42, content: {} }, writer).ok).toBe(false);
+    const oversized = 'x'.repeat(100_000);
+    const result = createPost({ title: oversized, content: 'body' }, writer);
+    expect(result.ok).toBe(true);
+    expect(getPostById(result.post.id).title).toBe(oversized);
+  });
+
   it('sorts newest first without mutating the original list', () => {
     const posts = [{ id: 'old', createdAt: '2024-01-01' }, { id: 'new', createdAt: '2025-01-01' }];
     expect(sortPostsNewestFirst(posts).map((post) => post.id)).toEqual(['new', 'old']);
@@ -66,6 +75,25 @@ describe('local post operations', () => {
     const post = createPost({ title: 'Draft', content: 'Body' }, writer).post;
     expect(deletePost(post.id, admin).ok).toBe(true);
     expect(getPosts()).toEqual([]);
+  });
+
+  it('rejects updates without a session and leaves the post unchanged', () => {
+    const post = createPost({ title: 'Draft', content: 'Body' }, writer).post;
+    const before = window.localStorage.getItem(POSTS_KEY);
+    expect(updatePost(post.id, { title: 'Changed', content: 'Changed body' }, null).ok).toBe(false);
+    expect(window.localStorage.getItem(POSTS_KEY)).toBe(before);
+    expect(getPostById(post.id)).toMatchObject({ title: 'Draft', content: 'Body' });
+  });
+
+  it('reports update and delete storage write failures without mutating persisted posts', () => {
+    const post = createPost({ title: 'Draft', content: 'Body' }, writer).post;
+    const before = window.localStorage.getItem(POSTS_KEY);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    expect(updatePost(post.id, { title: 'Changed', content: 'Changed body' }, writer).ok).toBe(false);
+    expect(window.localStorage.getItem(POSTS_KEY)).toBe(before);
+    expect(deletePost(post.id, writer).ok).toBe(false);
+    expect(window.localStorage.getItem(POSTS_KEY)).toBe(before);
+    setItem.mockRestore();
   });
 
   it('filters malformed records and handles corrupt or unavailable storage', () => {
