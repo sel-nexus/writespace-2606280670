@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+
+test('writer creates, reads, edits, and deletes a post with local persistence', async ({ page }) => {
+  const browserErrors = [];
+  page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Get Started Free' }).click();
+  await page.getByLabel('Display Name').fill('Rae Writer');
+  await page.getByLabel('Username').fill('rae');
+  await page.getByLabel('Password', { exact: true }).fill('secret');
+  await page.getByLabel('Confirm Password').fill('secret');
+  await page.getByRole('button', { name: 'Create Account' }).click();
+  await expect(page).toHaveURL(/\/blogs$/);
+  await expect(page.getByText('No blogs yet. Be the first to write one!')).toBeVisible();
+  await page.getByRole('link', { name: 'Write a Post' }).click();
+  await page.getByLabel('Title').fill('A note from the garden');
+  await page.getByLabel('Content').fill('The first warm morning arrived today.');
+  await expect(page.getByText('37 characters')).toBeVisible();
+  await page.getByRole('button', { name: 'Publish Post' }).click();
+  await expect(page).toHaveURL(/\/blog\//);
+  await expect(page.getByRole('heading', { name: 'A note from the garden' })).toBeVisible();
+  await expect(page.getByText('The first warm morning arrived today.')).toBeVisible();
+  await page.getByRole('link', { name: 'Edit' }).click();
+  await page.getByLabel('Content').fill('The first warm morning arrived today. The garden is waking up.');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(page.getByText('The garden is waking up.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('The garden is waking up.')).toBeVisible();
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page).toHaveURL(/\/blogs$/);
+  await expect(page.getByText('No blogs yet. Be the first to write one!')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/writespace-blog-mobile.png', fullPage: true });
+  expect(browserErrors).toEqual([]);
+});
